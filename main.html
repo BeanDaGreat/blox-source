@@ -150,19 +150,27 @@
         import { getFirestore, collection, addDoc, onSnapshot, query, serverTimestamp, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
-        // Vercel Deployment Note: If deploying to Vercel, ensure your environment 
-        // provides these variables. If not, the app will fail to initialize.
+        // VERCEL DEPLOYMENT TIPS:
+        // 1. Ensure this file is named exactly 'index.html'
+        // 2. Ensure it is in the root directory of your project.
+        // 3. If you have a vercel.json, make sure it doesn't have conflicting rewrites.
+        
         let firebaseConfig;
         try {
-            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-                // FALLBACK: Add your Firebase config object here manually if deployment fails
-                apiKey: "YOUR_API_KEY",
-                authDomain: "YOUR_PROJECT.firebaseapp.com",
-                projectId: "YOUR_PROJECT_ID",
-                storageBucket: "YOUR_PROJECT.appspot.com",
-                messagingSenderId: "YOUR_SENDER_ID",
-                appId: "YOUR_APP_ID"
-            };
+            // Priority 1: Environment variable injection (standard in this environment)
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                // Priority 2: Manual fallback for local/Vercel usage
+                firebaseConfig = {
+                    apiKey: "YOUR_API_KEY",
+                    authDomain: "YOUR_PROJECT.firebaseapp.com",
+                    projectId: "YOUR_PROJECT_ID",
+                    storageBucket: "YOUR_PROJECT.appspot.com",
+                    messagingSenderId: "YOUR_SENDER_ID",
+                    appId: "YOUR_APP_ID"
+                };
+            }
         } catch (e) {
             console.error("Firebase config missing or invalid.");
         }
@@ -256,14 +264,18 @@
 
         // --- Data Logic ---
         function listenToGames() {
-            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'games'));
-            onSnapshot(q, (snap) => {
-                allGames = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                renderGrid();
-            }, (err) => {
-                console.error("Firestore listener error:", err);
-            });
+            try {
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'games'));
+                onSnapshot(q, (snap) => {
+                    allGames = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                    renderGrid();
+                }, (err) => {
+                    console.error("Firestore listener error:", err);
+                });
+            } catch (e) {
+                console.error("Failed to start listener:", e);
+            }
         }
 
         function renderGrid() {
@@ -415,8 +427,6 @@
                 });
 
                 document.getElementById('uploadModal').classList.add('hidden');
-                // Use better feedback than full reload if possible
-                renderGrid();
                 alert("Upload Successful!");
             } catch (err) {
                 console.error("Upload error:", err);
